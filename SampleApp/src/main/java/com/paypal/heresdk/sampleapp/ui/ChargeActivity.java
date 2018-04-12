@@ -53,6 +53,7 @@ public class ChargeActivity extends Activity
         super.onCreate(savedInstanceState);
         Log.d(LOG_TAG, "onCreate");
         setContentView(R.layout.transaction_activity);
+        //setContentView(R.layout.donate_activity);
 
         radioAuthCapture = ((RadioButton) findViewById(R.id.radioAuthCapture));
     }
@@ -100,6 +101,108 @@ public class ChargeActivity extends Activity
       {
         txtViewCode.setVisibility(View.GONE);
       }
+    }
+
+    public void onDonateLowClicked(View view)
+    {
+        Log.d(LOG_TAG, "onDonateLowClicked");
+        BigDecimal val = new BigDecimal(3);
+        doDonate(view, val);
+    }
+
+    public void onDonateMedClicked(View view)
+    {
+        Log.d(LOG_TAG, "onDonateMedClicked");
+        BigDecimal val = new BigDecimal(5);
+        doDonate(view, val);
+    }
+
+    public void onDonateHighClicked(View view)
+    {
+        Log.d(LOG_TAG, "onDonateHighClicked");
+        BigDecimal val = new BigDecimal(10);
+        doDonate(view, val);
+    }
+
+    public void doDonate(View view, BigDecimal amount){
+        Log.d(LOG_TAG, "doDonate");
+
+        if (view != null) {
+            InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
+            imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+        }
+
+        if (amount.compareTo(BigDecimal.ZERO) == 0)
+        {
+            showInvalidAmountAlertDialog();
+            return;
+        }
+
+        Log.d(LOG_TAG, "doDonate amount:" + amount);
+
+        currentInvoice = new Invoice(null);
+        BigDecimal quantity = new BigDecimal(1);
+        currentInvoice.addItem("Item", quantity, amount, 1, null);
+
+
+        Log.d(LOG_TAG, "doDonate CreateTransaction");
+        //final TextView txtAcceptTranx = (TextView) findViewById(R.id.txtAcceptTransaction);
+
+        RetailSDK.getTransactionManager().createTransaction(currentInvoice, new TransactionManager.TransactionCallback()
+        {
+            @Override
+            public void transaction(RetailSDKException e, final TransactionContext context)
+            {
+                if (e != null) {
+                    final String errorTxt = e.toString();
+                    ChargeActivity.this.runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            Toast.makeText(getApplicationContext(), "create transaction error: " + errorTxt, Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                }
+                else
+                {
+                    ChargeActivity.this.runOnUiThread(new Runnable()
+                    {
+                        @Override
+                        public void run()
+                        {
+                            currentTransaction = context;
+
+                            PaymentDevice activeDevice = RetailSDK.getDeviceManager().getActiveReader();
+                            DeviceUpdate deviceUpdate = activeDevice.getPendingUpdate();
+                            if (deviceUpdate != null && deviceUpdate.getIsRequired() && !deviceUpdate.getWasInstalled())
+                            {
+                                deviceUpdate.offer(new DeviceUpdate.CompletedCallback()
+                                {
+                                    @Override
+                                    public void completed(RetailSDKException e, Boolean aBoolean)
+                                    {
+                                        Log.d(LOG_TAG, "device update completed");
+                                        ChargeActivity.this.beginPayment();
+                                    }
+                                });
+
+                            }
+                            else {
+                                beginPayment();
+                            }
+                            /*imgView.setImageResource(R.drawable.small_greenarrow);
+                            imgView.setClickable(false);
+                            txtCreateTranx.setTextColor(getResources().getColor(R.color.sdk_dark_gray));
+                            txtCreateTranx.setClickable(false);
+
+                            txtAcceptTranx.setClickable(true);
+                            txtAcceptTranx.setTextColor(getResources().getColor(R.color.sdk_blue));*/
+                        }
+                    });
+                }
+            }
+        });
+
+
     }
 
     public void onCreateInvoiceClicked(View view)
